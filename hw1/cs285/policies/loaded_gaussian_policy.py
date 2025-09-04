@@ -31,7 +31,13 @@ class LoadedGaussianPolicy(BasePolicy, nn.Module):
 
         with open(filename, 'rb') as f:
             data = pickle.loads(f.read())
+        
+        # Messing around
 
+        # print(data['GaussianPolicy'].keys())
+        # print(data['GaussianPolicy']['hidden']['FeedforwardNet']['layer_2']['AffineLayer']['W'].shape)
+        # print(data['GaussianPolicy']['hidden']['FeedforwardNet']['layer_0']['AffineLayer']['W'].shape)
+        
         self.nonlin_type = data['nonlin_type']
         if self.nonlin_type == 'lrelu':
             self.non_lin = nn.LeakyReLU(0.01)

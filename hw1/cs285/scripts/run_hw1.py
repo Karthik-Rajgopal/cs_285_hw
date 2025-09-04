@@ -62,7 +62,7 @@ def run_training_loop(params):
     #############
 
     # Make the gym environment
-    env = gym.make(params['env_name'], render_mode=None)
+    env = gym.make(params['env_name'], render_mode='rgb_array')
     env.reset(seed=seed)
 
     # Maximum length for episodes
@@ -118,6 +118,7 @@ def run_training_loop(params):
 
         # decide if videos should be rendered/logged at this iteration
         log_video = ((itr % params['video_log_freq'] == 0) and (params['video_log_freq'] != -1))
+    
         # decide if metrics should be logged
         log_metrics = (itr % params['scalar_log_freq'] == 0)
 
@@ -126,13 +127,24 @@ def run_training_loop(params):
             # BC training from expert data.
             paths = pickle.load(open(params['expert_data'], 'rb'))
             envsteps_this_batch = 0
+
+            # Understanding stuff
+
+            # print(type(paths))  # should be list
+            # print(len(paths))     # 2
+            # print(type(paths[0]))  # should be dict
+            # print(paths[0].keys())  # see what’s stored per path
+            # print(paths[0]['observation'].shape)  # number of timesteps in episode 0
+            # print(paths[1]['action'].shape)  # number of actions in episode 1
+            # print(type(paths[0]['observation']))
+            # exit()
         else:
             # DAGGER training from sampled data relabeled by expert
             assert params['do_dagger']
             # TODO: collect `params['batch_size']` transitions
             # HINT: use utils.sample_trajectories
             # TODO: implement missing parts of utils.sample_trajectory
-            paths, envsteps_this_batch = TODO
+            paths, envsteps_this_batch = utils.sample_trajectories(env, actor, params['batch_size'], params['ep_len'])
 
             # relabel the collected obs with actions from a provided expert policy
             if params['do_dagger']:
@@ -141,11 +153,21 @@ def run_training_loop(params):
                 # TODO: relabel collected obsevations (from our policy) with labels from expert policy
                 # HINT: query the policy (using the get_action function) with paths[i]["observation"]
                 # and replace paths[i]["action"] with these expert labels
-                paths = TODO
+
+                for path in paths:
+                    obs = path["observation"]                      # shape: [T, ob_dim]
+                    expert_acs = expert_policy.get_action(obs)     # shape: [T, ac_dim]
+                    path["action"] = expert_acs
+                
 
         total_envsteps += envsteps_this_batch
         # add collected data to replay buffer
         replay_buffer.add_rollouts(paths)
+
+        # Messing around
+
+        # print(np.shape(replay_buffer.obs))
+        # exit()
 
         # train agent (using sampled data from replay buffer)
         print('\nTraining agent using sampled data from replay buffer...')
@@ -154,15 +176,17 @@ def run_training_loop(params):
 
           # TODO: sample some data from replay_buffer
           # HINT1: how much data = params['train_batch_size']
+          batch_size = params['train_batch_size']
           # HINT2: use np.random.permutation to sample random indices
+          indices = np.random.permutation(replay_buffer.obs.shape[0])[:batch_size]
           # HINT3: return corresponding data points from each array (i.e., not different indices from each array)
           # for imitation learning, we only need observations and actions.  
-          ob_batch, ac_batch = TODO
+          ob_batch, ac_batch = replay_buffer.obs[indices], replay_buffer.acs[indices]
 
           # use the sampled data to train an agent
           train_log = actor.update(ob_batch, ac_batch)
           training_logs.append(train_log)
-
+    
         # log/save
         print('\nBeginning logging procedure...')
         if log_video:
